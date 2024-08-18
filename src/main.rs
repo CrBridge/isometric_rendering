@@ -155,18 +155,11 @@ pub fn main() {
                                 tile_scale as u32 * 2, tile_scale as u32)).unwrap();              
                             }
                         }
-                        //render new tile in red
-                        // the final part of this long conditional with the [][]
-                        // causes crashes, since it tries to check outside the bounds
-                        // of the array length. To fix, we just make it so border tiles
-                        // aren't highlighted. Pretty shoddy fix, but a real fix would mean
-                        // more statements and checking and this is already bloated,
-                        // so I'll come back to it once I actually implement some functions and
-                        // optimisation
-                        if mouse_x > 0 && mouse_x < map_size as i32 - 1 && 
-                        mouse_y > 0 && mouse_y < map_size as i32 - 1 &&
+                        if mouse_x >= 0 && mouse_x <= map_size as i32 - 1 && 
+                        mouse_y >= 0 && mouse_y <= map_size as i32 - 1 &&
                         map[mouse_x as usize][mouse_y as usize] == 1 &&
-                        map[mouse_x as usize + 1][mouse_y as usize + 1] == 1{
+                        (if mouse_x < map_size as i32 - 1 && mouse_y < map_size as i32 - 1
+                        {map[mouse_x as usize + 1][mouse_y as usize + 1] == 1 }else{true}){
                             if (mouse_x < map_size as i32 - 1 && map[mouse_x as usize + 1][mouse_y as usize] == 0) &&
                             (mouse_y < map_size as i32 - 1 && map[mouse_x as usize][mouse_y as usize + 1] == 0){}
                             else if mouse_x < map_size as i32 - 1 && map[mouse_x as usize + 1][mouse_y as usize] == 0{
