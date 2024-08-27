@@ -169,12 +169,24 @@ fn main() {
                     break 'running
                 },
                 Event::KeyDown { keycode: Some(Keycode::I), .. } => {
-                    canvas.clear();
-                    tile_scale += 1;
-                    for tile in map.iter() {
-                        tile.render(&mut canvas, &sprite_sheet, tile_scale);
+                    if tile_scale < 60 {
+                        canvas.clear();
+                        tile_scale += 1;
+                        for tile in map.iter() {
+                            tile.render(&mut canvas, &sprite_sheet, tile_scale);
+                        }
+                        canvas.present();
                     }
-                    canvas.present();
+                },
+                Event::KeyDown { keycode: Some(Keycode::O), .. } => {
+                    if tile_scale > 1 {
+                        canvas.clear();
+                        tile_scale -= 1;
+                        for tile in map.iter() {
+                            tile.render(&mut canvas, &sprite_sheet, tile_scale);
+                        }
+                        canvas.present();
+                    }
                 },
                 Event::KeyDown { keycode: Some(Keycode::W), .. } => {
                     canvas.clear();
