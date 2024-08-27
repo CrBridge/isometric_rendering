@@ -87,6 +87,11 @@ impl Tile {
 
         canvas.copy(texture, *outline_sprite, dst).expect("Error occurred rendering outlines");
     }
+    // altering tile co-ordinates for map movement
+    fn increment_x (&mut self) {self.x += 1}
+    fn decrement_x (&mut self) {self.x -= 1}
+    fn increment_y (&mut self) {self.y += 1}
+    fn decrement_y (&mut self) {self.y -= 1}
 }
 
 fn pixel_to_iso(x: i32, y: i32, window_width: i32, tile_scale: i32) -> (i32, i32) {
@@ -125,7 +130,7 @@ fn main() {
     let video_subsystem = sdl_context.video().unwrap();
     let window_width = 800;
     let window_height = 600;
-    let tile_scale = 20;
+    let mut tile_scale = 20;
     let map_size = 30;
 
     let window = video_subsystem.window(
@@ -141,7 +146,7 @@ fn main() {
     canvas.clear();
     canvas.present();
 
-    let map = generate_noisemap(map_size, 3, 0.1, 0.3);
+    let mut map = generate_noisemap(map_size, 3, 0.1, 0.3);
 
     let texture_loader = canvas.texture_creator();
     let sprite_sheet = texture_loader.load_texture("assets/tileset.png").unwrap();
@@ -162,6 +167,50 @@ fn main() {
                 Event::Quit {..} |
                 Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
                     break 'running
+                },
+                Event::KeyDown { keycode: Some(Keycode::I), .. } => {
+                    canvas.clear();
+                    tile_scale += 1;
+                    for tile in map.iter() {
+                        tile.render(&mut canvas, &sprite_sheet, tile_scale);
+                    }
+                    canvas.present();
+                },
+                Event::KeyDown { keycode: Some(Keycode::W), .. } => {
+                    canvas.clear();
+                    for tile in map.iter_mut() {
+                        tile.decrement_y();
+                        tile.decrement_x();
+                        tile.render(&mut canvas, &sprite_sheet, tile_scale);
+                    }
+                    canvas.present();
+                },
+                Event::KeyDown { keycode: Some(Keycode::A), .. } => {
+                    canvas.clear();
+                    for tile in map.iter_mut() {
+                        tile.increment_y();
+                        tile.decrement_x();
+                        tile.render(&mut canvas, &sprite_sheet, tile_scale);
+                    }
+                    canvas.present();
+                },
+                Event::KeyDown { keycode: Some(Keycode::S), .. } => {
+                    canvas.clear();
+                    for tile in map.iter_mut() {
+                        tile.increment_y();
+                        tile.increment_x();
+                        tile.render(&mut canvas, &sprite_sheet, tile_scale);
+                    }
+                    canvas.present();
+                },
+                Event::KeyDown { keycode: Some(Keycode::D), .. } => {
+                    canvas.clear();
+                    for tile in map.iter_mut() {
+                        tile.decrement_y();
+                        tile.increment_x();
+                        tile.render(&mut canvas, &sprite_sheet, tile_scale);
+                    }
+                    canvas.present();
                 },
                 Event::MouseMotion {x, y, ..} => {
                     // checks if the mouse has moved to a different tile, and if it has
