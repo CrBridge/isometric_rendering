@@ -23,9 +23,6 @@ struct Tile {
     terrain: Terrain
 }
 
-// I should think about possibly redoing the tile system
-//  For example, it might be better for the ore tile to be the same size as a grass tile,
-//  Then to render it I would just offset the y by half the size
 impl Tile {
     fn render(
         &self,
@@ -62,6 +59,9 @@ impl Tile {
         outline_sprite: &mut Rect,
         map: &Vec<Tile>
     ) {
+        // function renders a new outline sprite over the tile
+        // also checks surrounding tiles, and edits the sprite shape if needed
+        // if tile isn't visible due to surrounding tiles, does nothing
         let tile_right = map.iter().any(|f| f.x == self.x + 1 && f.y == self.y && f.terrain == Terrain::Coal);
         let tile_below = map.iter().any(|f| f.x == self.x && f.y == self.y + 1 && f.terrain == Terrain::Coal);
         let tile_right_below = map.iter().any(|f| f.x == self.x + 1 && f.y == self.y + 1 && f.terrain == Terrain::Coal);
@@ -90,8 +90,9 @@ impl Tile {
 }
 
 fn pixel_to_iso(x: i32, y: i32, window_width: i32, tile_scale: i32) -> (i32, i32) {
-    let iso_x = ((x - window_width as i32 / 2) / tile_scale + y * 2 / tile_scale) / 2;
-    let iso_y = (y * 2 / tile_scale - (x - window_width as i32 / 2) / tile_scale) / 2;
+    // converts the pixel co-ordinates to its equiv value for the iso grid
+    let iso_x = (((x as f32 - window_width as f32 / 2.0) / tile_scale as f32 + y as f32 * 2.0 / tile_scale as f32) / 2.0).round() as i32;
+    let iso_y = ((y as f32 * 2.0 / tile_scale as f32 - (x as f32 - window_width as f32 / 2.0) / tile_scale as f32) / 2.0).round() as i32;
     (iso_x, iso_y)
 }
 
@@ -124,7 +125,7 @@ fn main() {
     let video_subsystem = sdl_context.video().unwrap();
     let window_width = 800;
     let window_height = 600;
-    let tile_scale = 60;
+    let tile_scale = 20;
     let map_size = 30;
 
     let window = video_subsystem.window(
@@ -142,16 +143,12 @@ fn main() {
 
     let map = generate_noisemap(map_size, 3, 0.1, 0.3);
 
-    //moving the camera, with this setup should be easier, just iterate through tiles
-    // and offset either the x or y by 1. Might need to implement another function
-    // for the tile struct for that, (easy job though)
     let texture_loader = canvas.texture_creator();
     let sprite_sheet = texture_loader.load_texture("assets/tileset.png").unwrap();
     for tile in map.iter() {
         tile.render(&mut canvas, &sprite_sheet, tile_scale);
-        //canvas.present();
+        canvas.present();
     }
-    canvas.present();
 
     let mut prev_iso_x = -1;
     let mut prev_iso_y = -1;
@@ -167,6 +164,8 @@ fn main() {
                     break 'running
                 },
                 Event::MouseMotion {x, y, ..} => {
+                    // checks if the mouse has moved to a different tile, and if it has
+                    // render new outlines over the current and previous tile
                     let (iso_x, iso_y) = pixel_to_iso(x, y, window_width as i32, tile_scale);
                     
                     if iso_x != prev_iso_x || iso_y != prev_iso_y {
