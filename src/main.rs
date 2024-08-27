@@ -1,41 +1,104 @@
 extern crate sdl2;
 
-use rand::Rng;
 use sdl2::image::LoadTexture;
+use sdl2::video::Window;
 use sdl2::pixels::Color;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::rect::Rect;
 use std::time::Duration;
 use noise::{NoiseFn, Perlin};
+use rand::Rng;
 
-pub fn main() {
-    let sdl_context = sdl2::init().unwrap();
-    let video_subsystem = sdl_context.video().unwrap();
-    let window_width = 800;
-    let window_height = 600;
+#[derive(PartialEq, Debug)]
+enum Terrain {
+    Coal,
+    Grass
+}
 
-    let window = video_subsystem.window(
-        "rust-sdl2 demo", window_width, window_height
-    )
-        .position_centered()
-        .build()
-        .unwrap();
+#[derive(Debug)]
+struct Tile {
+    x: i32,
+    y: i32,
+    terrain: Terrain
+}
 
-    let mut canvas = window.into_canvas().build().unwrap();
+// I should think about possibly redoing the tile system
+//  For example, it might be better for the ore tile to be the same size as a grass tile,
+//  Then to render it I would just offset the y by half the size
+impl Tile {
+    fn render(
+        &self,
+        canvas: &mut sdl2::render::Canvas<Window>,
+        texture: &sdl2::render::Texture,
+        scale: i32
+    ) {
+        let tile_x;
+        let dst;
+        let src: Rect = match self.terrain {
+            Terrain::Grass => {
+                if rand::thread_rng().gen_range(0.0..1.0) > 0.5 {tile_x = 16;} else {tile_x = 32;};
+                dst = Rect::new(
+                (self.x as i32 * scale) - (self.y as i32 * scale) + (canvas.viewport().width() as i32 / 2) - (scale), 
+                (self.x as i32 * scale / 2) + (self.y as i32 * scale / 2), 
+                scale as u32 * 2, scale as u32 * 2);
+                Rect::new(tile_x, 16, 16, 16)
+            }
+            Terrain::Coal => {
+                dst = Rect::new(
+                    (self.x as i32 * scale) - (self.y as i32 * scale) + (canvas.viewport().width() as i32 / 2) - (scale), 
+                    (self.x as i32 * scale / 2) + (self.y as i32 * scale / 2) - (2 * scale), 
+                    scale as u32 * 2, scale as u32 * 4);
+                    Rect::new(48, 0, 16, 32)
+            }
+        };
+        canvas.copy(&texture, src, dst).expect("Error occurred rendering tile");
+    }
+    fn render_outline(
+        &self,
+        canvas: &mut sdl2::render::Canvas<Window>,
+        texture: &sdl2::render::Texture,
+        scale: i32,
+        outline_sprite: &mut Rect,
+        map: &Vec<Tile>
+    ) {
+        let tile_right = map.iter().any(|f| f.x == self.x + 1 && f.y == self.y && f.terrain == Terrain::Coal);
+        let tile_below = map.iter().any(|f| f.x == self.x && f.y == self.y + 1 && f.terrain == Terrain::Coal);
+        let tile_right_below = map.iter().any(|f| f.x == self.x + 1 && f.y == self.y + 1 && f.terrain == Terrain::Coal);
 
-    canvas.set_draw_color(Color::RGB(0, 255, 255));
-    canvas.clear();
-    canvas.present();
+        let mut dst = Rect::new(
+            (self.x as i32 * scale) - (self.y as i32 * scale) + (canvas.viewport().width() as i32 / 2) - (scale),
+            (self.x as i32 * scale / 2) + (self.y as i32 * scale / 2),
+            scale as u32 * 2, scale as u32
+        );
 
-    // generate noise map for terrain
-    let perlin = Perlin::new(3);
-    let threshold = 0.3;
-    let scale = 0.2;
-    let map_size = 50;
-    let mut map: Vec<Vec<i32>> = Vec::new();
+        if !tile_right && !tile_below && !tile_right_below {}
+        else if tile_right && !tile_below && !tile_right_below {
+            outline_sprite.set_width(outline_sprite.width() / 2);
+            dst.set_width(dst.width() / 2);
+        }
+        else if !tile_right && tile_below && !tile_right_below {
+            outline_sprite.set_width(outline_sprite.width() / 2);
+            outline_sprite.set_x(outline_sprite.x() + 8);
+            dst.set_width(dst.width() / 2);
+            dst.set_x(dst.x() + scale);
+        }
+        else {return;} 
+
+        canvas.copy(texture, *outline_sprite, dst).expect("Error occurred rendering outlines");
+    }
+}
+
+fn pixel_to_iso(x: i32, y: i32, window_width: i32, tile_scale: i32) -> (i32, i32) {
+    let iso_x = ((x - window_width as i32 / 2) / tile_scale + y * 2 / tile_scale) / 2;
+    let iso_y = (y * 2 / tile_scale - (x - window_width as i32 / 2) / tile_scale) / 2;
+    (iso_x, iso_y)
+}
+
+fn generate_noisemap(map_size: i32, seed: u32, scale: f64, threshold: f64) -> Vec<Tile> {
+    let perlin = Perlin::new(seed);
+    let mut map: Vec<Tile> = Vec::new();
     for y in 0..map_size {
-        let mut map_row: Vec<i32> = Vec::new();
         for x in 0..map_size {
             // Sample the noise function at different points with increased scale
             let noise_value = perlin.get([x as f64 * scale, y as f64 * scale]);
@@ -43,52 +106,55 @@ pub fn main() {
             let normalized_value = (noise_value + 1.0) / 2.0;
             // Threshold the normalized noise value to get binary output
             let grid_value = if normalized_value > threshold { 1 } else { 0 };
-            map_row.push(grid_value);
+            let terrain = match grid_value {
+                0 => {Terrain::Coal}
+                1 => {Terrain::Grass}
+                _ => {Terrain::Grass}
+            };
+            map.push(Tile {
+                x, y, terrain
+            });
         }
-        map.push(map_row);
     }
+    return map;
+}
 
-    //loading tilemap textures 
+fn main() {
+    let sdl_context = sdl2::init().unwrap();
+    let video_subsystem = sdl_context.video().unwrap();
+    let window_width = 800;
+    let window_height = 600;
+    let tile_scale = 60;
+    let map_size = 30;
+
+    let window = video_subsystem.window(
+        "rust-sdl2 demo", window_width, window_height
+    )
+        .position_centered()
+        .build()
+        .expect("issue with building window");
+
+    let mut canvas = window.into_canvas().build().unwrap();
+
+    canvas.set_draw_color(Color::RGB(0, 255, 255));
+    canvas.clear();
+    canvas.present();
+
+    let map = generate_noisemap(map_size, 3, 0.1, 0.3);
+
+    //moving the camera, with this setup should be easier, just iterate through tiles
+    // and offset either the x or y by 1. Might need to implement another function
+    // for the tile struct for that, (easy job though)
     let texture_loader = canvas.texture_creator();
-    let tile = texture_loader.load_texture("assets/tileset.png").unwrap();
-    canvas.set_draw_color(Color::RGB(0, 0, 0));
-    let tile_scale = 15;
-
-    // Tiles are centred by adding half the screen width minus tile width
-    let mut tile_x;
-    for x in 0..map_size {
-        for y in 0..map_size{
-            if map[x][y] == 1 {
-                // 50-50 chance to use either texture
-                if rand::thread_rng().gen_range(0.0..1.0) > 0.5 {tile_x = 16;} else {tile_x = 32;};
-                canvas.copy(&tile, Rect::new(
-                    tile_x, 16, 16, 16), 
-                Rect::new(
-                    (x as i32 * tile_scale) - (y as i32 * tile_scale) + (window_width as i32 / 2) - (tile_scale), 
-                    (x as i32 * tile_scale / 2) + (y as i32 * tile_scale / 2), 
-                    tile_scale as u32 * 2, tile_scale as u32 * 2)).unwrap();
-            }
-            else if map[x][y] == 0 {
-                // to deal with extra height, we offset the dst rect y value and multiply the height
-
-                canvas.copy(&tile, Rect::new(
-                    48, 0, 16, 32), 
-                Rect::new(
-                    (x as i32 * tile_scale) - (y as i32 * tile_scale) + (window_width as i32 / 2) - (tile_scale), 
-                    (x as i32 * tile_scale / 2) + (y as i32 * tile_scale / 2) - (2 * tile_scale), 
-                    tile_scale as u32 * 2, tile_scale as u32 * 4)).unwrap();
-            }
-            //this is here because I think it makes for a nice looking
-            // generation animation, If you want the entire map to load at once, just remove it
-            canvas.present();
-        }
+    let sprite_sheet = texture_loader.load_texture("assets/tileset.png").unwrap();
+    for tile in map.iter() {
+        tile.render(&mut canvas, &sprite_sheet, tile_scale);
+        //canvas.present();
     }
+    canvas.present();
 
-    // these variables will record the last known grid co-ords for the mouse
-    // if they change, then we do the rendering
-    let mut mouse_prev_x: i32 = -1;
-    let mut mouse_prev_y: i32 = -1;
-    let mut mouse_moved: bool;
+    let mut prev_iso_x = -1;
+    let mut prev_iso_y = -1;
 
     let mut event_pump = sdl_context.event_pump().unwrap();
     'running: loop {
@@ -100,109 +166,34 @@ pub fn main() {
                 Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
                     break 'running
                 },
-                // Mouse movement event
-                Event::MouseMotion { 
-                    timestamp: _, 
-                    window_id: _, 
-                    which: _, 
-                    mousestate: _, 
-                    x, 
-                    y, 
-                    xrel: _, 
-                    yrel: _ 
-                } => {
+                Event::MouseMotion {x, y, ..} => {
+                    let (iso_x, iso_y) = pixel_to_iso(x, y, window_width as i32, tile_scale);
                     
-                    // math here is supposed to do the opposite of above
-                    // instead of calculating screen co-ords from a grid, we need to reverse
-                    // the mouses screen co-ords to its hypothetical grid co-ords to find out
-                    // which tile it is hovering over
-                    let mouse_x = ((x - window_width as i32 / 2) / tile_scale + y * 2 / tile_scale) / 2;
-                    let mouse_y = (y * 2 / tile_scale - (x - window_width as i32 / 2) / tile_scale) / 2;
-                
-                    if mouse_x != mouse_prev_x || mouse_y != mouse_prev_y {mouse_moved = true}
-                    else {mouse_moved = false}
-
-                    //this block re-renders the tile at tile co-ords prev_x and prev_y
-                    // and renders the new tile at co-ords x and y
-                    if mouse_moved {
-                        // re-rendering original outline for previous tile
-                        if mouse_prev_x >= 0 && mouse_prev_x <= map_size as i32 - 1 && 
-                        mouse_prev_y >= 0 && mouse_prev_y <= map_size as i32 - 1 &&
-                        map[mouse_prev_x as usize][mouse_prev_y as usize] == 1{
-                            if (mouse_prev_x < map_size as i32 - 1 && map[mouse_prev_x as usize + 1][mouse_prev_y as usize] == 0) &&
-                            (mouse_prev_y < map_size as i32 - 1 && map[mouse_prev_x as usize][mouse_prev_y as usize + 1] == 0){}
-                            else if mouse_prev_x < map_size as i32 - 1 && map[mouse_prev_x as usize + 1][mouse_prev_y as usize] == 0{
-                                canvas.copy(&tile, Rect::new(
-                                    0, 24, 8, 8), 
-                                Rect::new(
-                                    (mouse_prev_x as i32 * tile_scale) - (mouse_prev_y as i32 * tile_scale) + (window_width as i32 / 2) - (tile_scale), 
-                                    (mouse_prev_x as i32 * tile_scale / 2) + (mouse_prev_y as i32 * tile_scale / 2), 
-                                    tile_scale as u32, tile_scale as u32)).unwrap();
-                            }
-                            else if mouse_prev_y < map_size as i32 - 1 && map[mouse_prev_x as usize][mouse_prev_y as usize + 1] == 0{
-                                canvas.copy(&tile, Rect::new(
-                                    8, 24, 8, 8), 
-                                Rect::new(
-                                    (mouse_prev_x as i32 * tile_scale) - (mouse_prev_y as i32 * tile_scale) + (window_width as i32 / 2), 
-                                    (mouse_prev_x as i32 * tile_scale / 2) + (mouse_prev_y as i32 * tile_scale / 2), 
-                                    tile_scale as u32, tile_scale as u32)).unwrap();
-                            } else {
-                            canvas.copy(&tile, Rect::new(
-                                0, 24, 16, 8), 
-                            Rect::new(
-                                (mouse_prev_x as i32 * tile_scale) - (mouse_prev_y as i32 * tile_scale) + (window_width as i32 / 2) - (tile_scale), 
-                                (mouse_prev_x as i32 * tile_scale / 2) + (mouse_prev_y as i32 * tile_scale / 2), 
-                                tile_scale as u32 * 2, tile_scale as u32)).unwrap();              
+                    if iso_x != prev_iso_x || iso_y != prev_iso_y {
+                        if prev_iso_x >= 0 && prev_iso_y >= 0 {
+                            if let Some(tile) = map.iter().find(
+                                |f| f.x == prev_iso_x && f.y == prev_iso_y && f.terrain == Terrain::Grass
+                            ) {
+                                let mut outline_old = Rect::new(0, 24, 16, 8);
+                                tile.render_outline(&mut canvas, &sprite_sheet, tile_scale, &mut outline_old, &map);
                             }
                         }
-                        if mouse_x >= 0 && mouse_x <= map_size as i32 - 1 && 
-                        mouse_y >= 0 && mouse_y <= map_size as i32 - 1 &&
-                        map[mouse_x as usize][mouse_y as usize] == 1 &&
-                        (if mouse_x < map_size as i32 - 1 && mouse_y < map_size as i32 - 1
-                        {map[mouse_x as usize + 1][mouse_y as usize + 1] == 1 }else{true}){
-                            if (mouse_x < map_size as i32 - 1 && map[mouse_x as usize + 1][mouse_y as usize] == 0) &&
-                            (mouse_y < map_size as i32 - 1 && map[mouse_x as usize][mouse_y as usize + 1] == 0){}
-                            else if mouse_x < map_size as i32 - 1 && map[mouse_x as usize + 1][mouse_y as usize] == 0{
-                                canvas.copy(&tile, Rect::new(
-                                    0, 16, 8, 8), 
-                                Rect::new(
-                                    (mouse_x as i32 * tile_scale) - (mouse_y as i32 * tile_scale) + (window_width as i32 / 2) - (tile_scale), 
-                                    (mouse_x as i32 * tile_scale / 2) + (mouse_y as i32 * tile_scale / 2), 
-                                    tile_scale as u32, tile_scale as u32)).unwrap();
-                            }
-                            else if mouse_y < map_size as i32 - 1 && map[mouse_x as usize][mouse_y as usize + 1] == 0{
-                                canvas.copy(&tile, Rect::new(
-                                    8, 16, 8, 8), 
-                                Rect::new(
-                                    (mouse_x as i32 * tile_scale) - (mouse_y as i32 * tile_scale) + (window_width as i32 / 2), 
-                                    (mouse_x as i32 * tile_scale / 2) + (mouse_y as i32 * tile_scale / 2), 
-                                    tile_scale as u32, tile_scale as u32)).unwrap();
-                            } else {
-                            canvas.copy(&tile, Rect::new(
-                                0, 16, 16, 8), 
-                            Rect::new(
-                                (mouse_x as i32 * tile_scale) - (mouse_y as i32 * tile_scale) + (window_width as i32 / 2) - (tile_scale), 
-                                (mouse_x as i32 * tile_scale / 2) + (mouse_y as i32 * tile_scale / 2), 
-                                tile_scale as u32 * 2, tile_scale as u32)).unwrap();              
+                        if iso_x >= 0 && iso_x < map_size && iso_y >= 0 && iso_y < map_size {
+                            if let Some(tile) = map.iter().find(
+                                |f| f.x == iso_x && f.y == iso_y && f.terrain == Terrain::Grass
+                            ) {
+                                let mut outline_new = Rect::new(0, 16, 16, 8);
+                                tile.render_outline(&mut canvas, &sprite_sheet, tile_scale, &mut outline_new, &map);
                             }
                         }
-
-                        //swap out prev for current and render changes
-                        mouse_prev_x = mouse_x;
-                        mouse_prev_y = mouse_y;
+                        prev_iso_x = iso_x;
+                        prev_iso_y = iso_y;
                         canvas.present();
                     }
-                },
+                }
                 _ => {}
             }
         }
         std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
-        //TODO: zoom, pan
-        // like there are slight issues with cursor offset
-        //  probably due to tile origin being top-left corner, shouldnt be too bad to fix
-        // For zooming I think that would involve putting the map generation into a function
-        // for conveinence, and then calling it after increasing/decreasing the tile size
-        // After that I would want to implement panning, not sure how I'll do that though
-        //      Only x or y at a time most likely,can do some off-set math and then redraw
     }
 }
