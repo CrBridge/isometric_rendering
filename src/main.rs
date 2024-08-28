@@ -158,6 +158,11 @@ fn main() {
     let mut prev_iso_x = -1;
     let mut prev_iso_y = -1;
 
+    // range of values that x and y co-ords are between
+    // used since panning feature directly alters the co-ords
+    let mut y_offset = 0;
+    let mut x_offset = 0;
+
     let mut event_pump = sdl_context.event_pump().unwrap();
     'running: loop {
         for event in event_pump.poll_iter() {
@@ -195,6 +200,8 @@ fn main() {
                         tile.decrement_x();
                         tile.render(&mut canvas, &sprite_sheet, tile_scale);
                     }
+                    y_offset -= 1;
+                    x_offset -= 1;
                     canvas.present();
                 },
                 Event::KeyDown { keycode: Some(Keycode::A), .. } => {
@@ -204,6 +211,8 @@ fn main() {
                         tile.decrement_x();
                         tile.render(&mut canvas, &sprite_sheet, tile_scale);
                     }
+                    y_offset += 1;
+                    x_offset -= 1;
                     canvas.present();
                 },
                 Event::KeyDown { keycode: Some(Keycode::S), .. } => {
@@ -213,6 +222,8 @@ fn main() {
                         tile.increment_x();
                         tile.render(&mut canvas, &sprite_sheet, tile_scale);
                     }
+                    y_offset += 1;
+                    x_offset += 1;
                     canvas.present();
                 },
                 Event::KeyDown { keycode: Some(Keycode::D), .. } => {
@@ -222,15 +233,17 @@ fn main() {
                         tile.increment_x();
                         tile.render(&mut canvas, &sprite_sheet, tile_scale);
                     }
+                    y_offset -= 1;
+                    x_offset += 1;
                     canvas.present();
                 },
                 Event::MouseMotion {x, y, ..} => {
                     // checks if the mouse has moved to a different tile, and if it has
                     // render new outlines over the current and previous tile
                     let (iso_x, iso_y) = pixel_to_iso(x, y, window_width as i32, tile_scale);
-                    
+
                     if iso_x != prev_iso_x || iso_y != prev_iso_y {
-                        if prev_iso_x >= 0 && prev_iso_y >= 0 {
+                        if prev_iso_x >= (0 + x_offset) && prev_iso_x < (map_size + x_offset) && prev_iso_y >= (0 + y_offset) && prev_iso_y < (map_size + y_offset) {
                             if let Some(tile) = map.iter().find(
                                 |f| f.x == prev_iso_x && f.y == prev_iso_y && f.terrain == Terrain::Grass
                             ) {
@@ -238,7 +251,7 @@ fn main() {
                                 tile.render_outline(&mut canvas, &sprite_sheet, tile_scale, &mut outline_old, &map);
                             }
                         }
-                        if iso_x >= 0 && iso_x < map_size && iso_y >= 0 && iso_y < map_size {
+                        if iso_x >= (0 + x_offset) && iso_x < (map_size + x_offset) && iso_y >= (0 + y_offset) && iso_y < (map_size + y_offset) {
                             if let Some(tile) = map.iter().find(
                                 |f| f.x == iso_x && f.y == iso_y && f.terrain == Terrain::Grass
                             ) {
