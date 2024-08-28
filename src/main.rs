@@ -13,7 +13,8 @@ use rand::Rng;
 #[derive(PartialEq, Debug)]
 enum Terrain {
     Coal,
-    Grass
+    Grass,
+    Flowers
 }
 
 #[derive(Debug)]
@@ -30,16 +31,21 @@ impl Tile {
         texture: &sdl2::render::Texture,
         scale: i32
     ) {
-        let tile_x;
         let dst;
         let src: Rect = match self.terrain {
             Terrain::Grass => {
-                if rand::thread_rng().gen_range(0.0..1.0) > 0.5 {tile_x = 16;} else {tile_x = 32;};
                 dst = Rect::new(
                 (self.x as i32 * scale) - (self.y as i32 * scale) + (canvas.viewport().width() as i32 / 2) - (scale), 
                 (self.x as i32 * scale / 2) + (self.y as i32 * scale / 2), 
                 scale as u32 * 2, scale as u32 * 2);
-                Rect::new(tile_x, 16, 16, 16)
+                Rect::new(32, 16, 16, 16)
+            }
+            Terrain::Flowers => {
+                dst = Rect::new(
+                (self.x as i32 * scale) - (self.y as i32 * scale) + (canvas.viewport().width() as i32 / 2) - (scale), 
+                (self.x as i32 * scale / 2) + (self.y as i32 * scale / 2), 
+                scale as u32 * 2, scale as u32 * 2);
+                Rect::new(16, 16, 16, 16)
             }
             Terrain::Coal => {
                 dst = Rect::new(
@@ -114,7 +120,9 @@ fn generate_noisemap(map_size: i32, seed: u32, scale: f64, threshold: f64) -> Ve
             let grid_value = if normalized_value > threshold { 1 } else { 0 };
             let terrain = match grid_value {
                 0 => {Terrain::Coal}
-                1 => {Terrain::Grass}
+                1 => {
+                    if rand::thread_rng().gen_range(0.0..1.0) > 0.5 {Terrain::Grass} else {Terrain::Flowers}
+                }
                 _ => {Terrain::Grass}
             };
             map.push(Tile {
@@ -158,7 +166,7 @@ fn main() {
     let mut prev_iso_x = -1;
     let mut prev_iso_y = -1;
 
-    // range of values that x and y co-ords are between
+    // values used to offset the bound checking for mouse event
     // used since panning feature directly alters the co-ords
     let mut y_offset = 0;
     let mut x_offset = 0;
@@ -245,7 +253,7 @@ fn main() {
                     if iso_x != prev_iso_x || iso_y != prev_iso_y {
                         if prev_iso_x >= (0 + x_offset) && prev_iso_x < (map_size + x_offset) && prev_iso_y >= (0 + y_offset) && prev_iso_y < (map_size + y_offset) {
                             if let Some(tile) = map.iter().find(
-                                |f| f.x == prev_iso_x && f.y == prev_iso_y && f.terrain == Terrain::Grass
+                                |f| f.x == prev_iso_x && f.y == prev_iso_y && f.terrain != Terrain::Coal
                             ) {
                                 let mut outline_old = Rect::new(0, 24, 16, 8);
                                 tile.render_outline(&mut canvas, &sprite_sheet, tile_scale, &mut outline_old, &map);
@@ -253,7 +261,7 @@ fn main() {
                         }
                         if iso_x >= (0 + x_offset) && iso_x < (map_size + x_offset) && iso_y >= (0 + y_offset) && iso_y < (map_size + y_offset) {
                             if let Some(tile) = map.iter().find(
-                                |f| f.x == iso_x && f.y == iso_y && f.terrain == Terrain::Grass
+                                |f| f.x == iso_x && f.y == iso_y && f.terrain != Terrain::Coal
                             ) {
                                 let mut outline_new = Rect::new(0, 16, 16, 8);
                                 tile.render_outline(&mut canvas, &sprite_sheet, tile_scale, &mut outline_new, &map);
