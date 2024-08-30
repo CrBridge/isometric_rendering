@@ -49,10 +49,10 @@ impl Tile {
             }
             Terrain::Coal => {
                 dst = Rect::new(
-                    (self.x as i32 * scale) - (self.y as i32 * scale) + (canvas.viewport().width() as i32 / 2) - (scale), 
-                    (self.x as i32 * scale / 2) + (self.y as i32 * scale / 2) - (2 * scale), 
-                    scale as u32 * 2, scale as u32 * 4);
-                    Rect::new(48, 0, 16, 32)
+                (self.x as i32 * scale) - (self.y as i32 * scale) + (canvas.viewport().width() as i32 / 2) - (scale), 
+                (self.x as i32 * scale / 2) + (self.y as i32 * scale / 2) - (scale), 
+                scale as u32 * 2, scale as u32 * 3);
+                Rect::new(48, 8, 16, 24)
             }
         };
         canvas.copy(&texture, src, dst).expect("Error occurred rendering tile");
@@ -138,8 +138,8 @@ fn main() {
     let video_subsystem = sdl_context.video().unwrap();
     let window_width = 800;
     let window_height = 600;
-    let mut tile_scale = 20;
-    let map_size = 30;
+    let mut tile_scale = 10;
+    let map_size = 100;
 
     let window = video_subsystem.window(
         "rust-sdl2 demo", window_width, window_height
@@ -160,8 +160,8 @@ fn main() {
     let sprite_sheet = texture_loader.load_texture("assets/tileset.png").unwrap();
     for tile in map.iter() {
         tile.render(&mut canvas, &sprite_sheet, tile_scale);
-        canvas.present();
     }
+    canvas.present();
 
     let mut prev_iso_x = -1;
     let mut prev_iso_y = -1;
@@ -271,7 +271,7 @@ fn main() {
                         prev_iso_y = iso_y;
                         canvas.present();
                     }
-                }
+                },
                 _ => {}
             }
         }
