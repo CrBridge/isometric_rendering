@@ -28,7 +28,7 @@ fn main() {
     canvas.clear();
     canvas.present();
 
-    let mut map = generate_noisemap(map_size, 3, 0.1, 0.3);
+    let mut map = generate_noisemap(map_size, 3, 0.1, 0.3, 0.9);
 
     let texture_loader = canvas.texture_creator();
     let sprite_sheet = texture_loader.load_texture("assets/tileset.png").unwrap();

@@ -5,6 +5,7 @@ use sdl2::rect::Rect;
 pub enum Terrain {
     Coal,
     Grass,
+    Water,
     Flowers
 }
 
@@ -37,6 +38,13 @@ impl Tile {
                 (self.x as i32 * scale / 2) + (self.y as i32 * scale / 2), 
                 scale as u32 * 2, scale as u32 * 2);
                 Rect::new(16, 16, 16, 16)
+            }
+            Terrain::Water => {
+                dst = Rect::new(
+                (self.x as i32 * scale) - (self.y as i32 * scale) + (canvas.viewport().width() as i32 / 2) - (scale), 
+                (self.x as i32 * scale / 2) + (self.y as i32 * scale / 2), 
+                scale as u32 * 2, scale as u32 * 2);
+                Rect::new(32, 0, 16, 16)
             }
             Terrain::Coal => {
                 dst = Rect::new(
@@ -84,13 +92,11 @@ impl Tile {
 
         canvas.copy(texture, *outline_sprite, dst).expect("Error occurred rendering outlines");
     }
-    // altering tile co-ordinates for map movement
-    //pub fn increment_x (&mut self) {self.x += 1}
-    //pub fn decrement_x (&mut self) {self.x -= 1}
-    //pub fn increment_y (&mut self) {self.y += 1}
-    //pub fn decrement_y (&mut self) {self.y -= 1}
     pub fn move_tiles (&mut self, x: i32, y: i32) {
         self.x += x;
         self.y += y;
+    }
+    pub fn change_tile (&mut self, terrain: Terrain) {
+        self.terrain = terrain;
     }
 }

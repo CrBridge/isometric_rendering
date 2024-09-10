@@ -44,7 +44,7 @@ pub fn handle_controls(
                     }
                 },
                 Event::KeyDown { keycode: Some(Keycode::O), .. } => {
-                    if *tile_scale > 1 {
+                    if *tile_scale > 3 {
                         canvas.clear();
                         *tile_scale -= 1;
                         for tile in map.iter() {
@@ -98,7 +98,7 @@ pub fn handle_controls(
                     // render new outlines over the current and previous tile
                     let (iso_x, iso_y) = pixel_to_iso(x, y, window_width as i32, *tile_scale);
 
-                    if iso_x != *prev_iso_x || iso_y != *prev_iso_y {
+                    if (iso_x != *prev_iso_x || iso_y != *prev_iso_y) && *tile_scale >= 8 {
                         if *prev_iso_x >= (0 + *x_offset) && *prev_iso_x < (map_size + *x_offset) && *prev_iso_y >= (0 + *y_offset) && *prev_iso_y < (map_size + *y_offset) {
                             if let Some(tile) = map.iter().find(
                                 |f| f.x == *prev_iso_x && f.y == *prev_iso_y && f.terrain != Terrain::Coal
